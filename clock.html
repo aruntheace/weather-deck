@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>World Clocks Dashboard</title>
+    <!-- Tone.js Library for sound generation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <style>
+        body {
+            background-color: #000000;
+            color: #E0E0E0;
+            font-family: 'Poppins', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            padding-top: 80px; /* Space for top elements */
+            position: relative;
+            text-rendering: optimizeLegibility;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            box-sizing: border-box;
+        }
+
+        .top-info-container {
+            position: absolute;
+            top: 25px;
+            right: 25px;
+            display: flex;
+            justify-content: flex-end; 
+            align-items: flex-start;
+            width: calc(100% - 50px); 
+            z-index: 10;
+        }
+
+        .battery-level {
+            font-size: 32px; 
+            font-weight: 600; 
+            color: #4CAF50; 
+            display: flex;
+            align-items: center;
+        }
+
+        .battery-icon {
+            margin-right: 10px; 
+            font-size: 34px; 
+        }
+
+        .main-clock-container {
+            text-align: center;
+            padding: 20px;
+            border-radius: 15px;
+            margin-bottom: 25px;
+        }
+
+        .main-clock-container .city {
+            font-size: 32px; 
+            color: #AEC6CF; 
+            font-weight: 600;
+            margin-bottom: 8px;
+            text-shadow: 0 0 10px rgba(174, 198, 207, 0.2); 
+        }
+
+        .main-clock-container .time {
+            font-size: 130px;
+            font-weight: 700;
+            color: #FFFFFF;
+            margin: 0;
+            line-height: 1;
+            text-shadow: 0 0 20px rgba(255, 255, 255, 0.3), 0 0 30px rgba(0, 169, 255, 0.2);
+        }
+
+        .main-clock-container .date {
+            font-size: 26px;
+            color: #B0BEC5; 
+            margin: 15px 0 5px 0;
+            font-weight: 400;
+        }
+
+        .main-clock-container .quote {
+            font-size: 18px;
+            color: #C5D9E2;
+            font-weight: 500;
+            margin-top: 15px;
+            max-width: 75%;
+            margin-left: auto;
+            margin-right: auto;
+            line-height: 1.5;
+        }
+
+        .sub-clocks {
+            display: flex;
+            gap: 25px;
+            justify-content: center;
+            flex-wrap: wrap;
+            padding: 15px;
+            width: 100%;
+            max-width: 1200px;
+        }
+
+        .sub-clock {
+            text-align: center;
+            background-color: rgba(255, 255, 255, 0.04);
+            padding: 18px 22px;
+            border-radius: 10px;
+            min-width: 180px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .sub-clock:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(0, 120, 200, 0.3);
+        }
+
+        .sub-clock .city {
+            font-size: 20px;
+            color: #87CEEB; 
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+
+        .sub-clock .time {
+            font-size: 34px;
+            color: #F5F5F5;
+            font-weight: 600;
+        }
+
+        /* Styles for the chime image */
+        .chime-image-container {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000;
+            display: none; /* Hidden by default */
+        }
+
+        .chime-image-container img {
+            max-width: 150px;
+            height: auto;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        }
+
+    </style>
+</head>
+<body>
+    <div class="top-info-container">
+        <div class="battery-level">
+            <span id="battery-icon" class="battery-icon">🔋</span>
+            <span id="battery-level-text">Checking...</span>
+        </div>
+    </div>
+
+    <!-- Chime Image Container -->
+    <div class="chime-image-container" id="chimeImageContainer">
+        <img id="chimeImage" src="https://i.giphy.com/oUYcLbDMAprWE4i3dQ.webp" alt="Chime Animation" onerror="this.style.display='none'; console.error('Giphy image failed to load.');">
+    </div>
+
+    <div class="main-clock-container">
+        <div class="city">New Delhi, India</div>
+        <div class="time" id="india-time"></div>
+        <div class="date" id="india-date"></div>
+        <div class="quote" id="success-quote"></div> 
+    </div>
+
+    <div class="sub-clocks">
+        <div class="sub-clock">
+            <div class="city">London</div>
+            <div class="time" id="london-time"></div>
+        </div>
+        <div class="sub-clock">
+            <div class="city">New York</div>
+            <div class="time" id="newyork-time"></div>
+        </div>
+        <div class="sub-clock">
+            <div class="city">Sydney</div>
+            <div class="time" id="sydney-time"></div>
+        </div>
+    </div>
+
+    <script>
+        // --- Quotes Array ---
+        const successQuotes = [
+            "Success is not final, failure is not fatal: It is the courage to continue that counts. - Winston Churchill",
+            "The only way to do great work is to love what you do. - Steve Jobs",
+            "Hardships often prepare ordinary people for an extraordinary destiny. - C.S. Lewis",
+            "Believe you can and you're halfway there. - Theodore Roosevelt",
+            "The future belongs to those who believe in the beauty of their dreams. - Eleanor Roosevelt",
+            "Success usually comes to those who are too busy to be looking for it. - Henry David Thoreau",
+            "Don't watch the clock; do what it does. Keep going. - Sam Levenson",
+            "The harder I work, the luckier I get. - Samuel Goldwyn",
+            "Opportunities don't happen. You create them. - Chris Grosser",
+            "Success is the sum of small efforts, repeated day in and day out. - Robert Collier",
+            "The only place where success comes before work is in the dictionary. - Vidal Sassoon",
+            "I find that the harder I work, the more luck I seem to have. - Thomas Jefferson"
+        ];
+
+        // --- Function to Update Quote ---
+        function updateQuote() {
+            const quoteElement = document.getElementById('success-quote');
+            if (quoteElement) {
+                const randomIndex = Math.floor(Math.random() * successQuotes.length);
+                quoteElement.textContent = successQuotes[randomIndex];
+            }
+        }
+
+        // --- Chime and Image Logic ---
+        const chimeImageContainer = document.getElementById('chimeImageContainer');
+        let synth;
+        let hasChimedForCurrentSlot = false;
+        let audioInitialized = false;
+
+        // Function to initialize audio context and synth.
+        // This is the most likely point of failure due to browser autoplay policies.
+        async function initializeAudio() {
+            if (audioInitialized) return;
+            try {
+                // Tone.start() must be called after a user interaction (like a click)
+                // We attempt to call it on load, but it might not work in all scenarios.
+                await Tone.start(); 
+                synth = new Tone.Synth({
+                    oscillator: { type: 'sine' },
+                    envelope: { attack: 0.005, decay: 0.1, sustain: 0.3, release: 0.3 }
+                }).toDestination();
+                console.log("SUCCESS: Tone.js audio context started and synth initialized.");
+                audioInitialized = true;
+            } catch (e) {
+                console.error("ERROR: Could not start Tone.js audio context. User interaction with the page may be required.", e);
+            }
+        }
+        
+        // Attempt to initialize audio as soon as the page loads.
+        window.addEventListener('load', initializeAudio);
+        // Fallback: A single click anywhere will also attempt to initialize it.
+        document.body.addEventListener('click', initializeAudio, { once: true });
+
+
+        function playChimeAndShowImage() {
+            // This function is only called if audio is believed to be ready.
+            synth.triggerAttackRelease("C5", "8n"); // Play a C5 note for an 8th note duration
+
+            if (chimeImageContainer) {
+                chimeImageContainer.style.display = 'block';
+                setTimeout(() => {
+                    chimeImageContainer.style.display = 'none';
+                }, 4000); // Show image for 4 seconds
+            }
+        }
+
+        // --- Clock Update Function ---
+        function updateTime() {
+            const indiaTime = new Date();
+            // Format India Time
+            const indiaTimeStr = indiaTime.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+            const indiaDateStr = indiaTime.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+
+            document.getElementById('india-time').textContent = indiaTimeStr;
+            document.getElementById('india-date').textContent = indiaDateStr;
+
+            // --- Refined Chime Logic ---
+            const currentMinutes = indiaTime.getMinutes();
+            const currentSeconds = indiaTime.getSeconds();
+
+            if ((currentMinutes === 0 || currentMinutes === 30)) {
+                if (currentSeconds === 0 && !hasChimedForCurrentSlot) {
+                    
+                    // Define what to do when it's time to chime
+                    const attemptChime = () => {
+                        if (audioInitialized && synth) {
+                            console.log(`Chime Time: Attempting to play sound at ${currentMinutes}:${currentSeconds}.`);
+                            playChimeAndShowImage();
+                            hasChimedForCurrentSlot = true; // Set flag only on successful attempt
+                        } else {
+                            console.warn(`Chime Time: Cannot play sound because audio is not ready. Try clicking the page once.`);
+                        }
+                    };
+                    
+                    // Check if audio is ready, if not, try one last time.
+                    if (!audioInitialized) {
+                        initializeAudio().then(attemptChime);
+                    } else {
+                        attemptChime();
+                    }
+                }
+            } else {
+                // Reset the flag once we are past the 0 or 30 minute mark.
+                hasChimedForCurrentSlot = false;
+            }
+
+
+            // Calculate other city times
+            try {
+                const londonTime = new Date(indiaTime.toLocaleString("en-US", { timeZone: "Europe/London" }));
+                const newYorkTime = new Date(indiaTime.toLocaleString("en-US", { timeZone: "America/New_York" }));
+                const sydneyTime = new Date(indiaTime.toLocaleString("en-US", { timeZone: "Australia/Sydney" }));
+
+                document.getElementById('london-time').textContent = londonTime.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: true }).toLowerCase();
+                document.getElementById('newyork-time').textContent = newYorkTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }).toLowerCase();
+                document.getElementById('sydney-time').textContent = sydneyTime.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit', hour12: true }).toLowerCase();
+            } catch (e) {
+                console.error("Error setting timezone clocks:", e);
+            }
+        }
+
+        // --- Battery Status Function ---
+        function updateBatteryDisplay() {
+            if (navigator.getBattery) {
+                navigator.getBattery().then(function(battery) {
+                    const batteryLevelTextEl = document.getElementById('battery-level-text');
+                    const batteryIconEl = document.getElementById('battery-icon');
+                    function updateStatus() {
+                        batteryIconEl.textContent = battery.charging ? '⚡' : '🔋'; 
+                        batteryLevelTextEl.textContent = ` ${(battery.level * 100).toFixed(0)}%`; 
+                    }
+                    updateStatus();
+                    battery.addEventListener('levelchange', updateStatus);
+                    battery.addEventListener('chargingchange', updateStatus);
+                });
+            } else {
+                const batteryDisplayElement = document.querySelector('.battery-level');
+                if (batteryDisplayElement) {
+                    batteryDisplayElement.textContent = "Battery API N/A";
+                }
+            }
+        }
+
+        // --- Initial Calls & Intervals ---
+        updateTime(); 
+        setInterval(updateTime, 1000); 
+
+        updateBatteryDisplay(); 
+        updateQuote(); 
+
+    </script>
+</body>
+</html>
