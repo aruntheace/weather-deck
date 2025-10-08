@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Mortgage Overpayment Calculator (UK) — Save Interest & Cut Years</title>
+  <meta name="description" content="Calculate how monthly or lump-sum overpayments change your UK mortgage. ERC/allowance aware, daily-interest accurate. Compare reduce-term vs reduce-payment and invest-vs-overpay." />
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" />
+  <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <style>
+    :root{
+      --primary:#2563eb; --primary-600:#1d4ed8;
+      --bg:#f9fafb; --surface:#fff; --text:#111827; --muted:#4b5563; --border:#e5e7eb;
+      --neutral-active:#111827; --neutral-bg:#f3f4f6;
+      --radius:12px; --shadow:0 4px 12px rgba(0,0,0,.08)
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--text);line-height:1.55}
+    .wrap{max-width:1100px;margin:auto;padding:16px}
+
+    /* Header */
+    .app-header{position:sticky;top:0;background:var(--surface);border-bottom:1px solid var(--border);z-index:20}
+    .head-in{display:flex;align-items:center;justify-content:space-between;height:58px;gap:16px;padding:0 16px}
+    .brand{font-weight:700}
+    .nav a{color:var(--muted);text-decoration:none;font-size:14px;margin-left:12px}
+    .nav a:hover{color:var(--primary)}
+
+    h1{margin:14px 0 6px;font-size:clamp(26px,3.5vw,36px)}
+    .sub{color:var(--muted);max-width:860px;margin:0 0 12px}
+    .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow)}
+    .section{padding:18px}
+
+    /* Inputs grid */
+    .fields{display:grid;grid-template-columns:1fr;gap:12px}
+    @media (min-width:720px){ .fields{grid-template-columns:repeat(3,minmax(0,1fr))} }
+    .field label{display:block;font-size:13px;font-weight:600;margin:0 0 6px}
+
+    /* Composite input: no absolute positioning, works on Safari/iOS */
+.control{
+  display:grid;
+  grid-template-columns:auto 1fr;          /* prefix */
+  align-items:center;
+  border:1px solid var(--border);
+  border-radius:8px;
+  background:#fff;
+}
+.control--suffix{ grid-template-columns:1fr auto; } /* for % on right */
+
+.control-affix{
+  padding:0 12px;
+  color:#6b7280;
+  font-size:15px;
+  user-select:none;
+}
+
+.control-input{
+  width:100%;
+  border:0;
+  padding:10px 12px;
+  font-size:15px;
+  background:transparent;
+  font-variant-numeric:tabular-nums;
+  outline:none; /* rely on wrapper focus */
+}
+
+/* focus ring on wrapper when input focused */
+.control:has(.control-input:focus){
+  box-shadow:0 0 0 2px rgba(37,99,235,.35);
+  border-color:#93c5fd;
+}
+
+/* remove number spinners just in case */
+.control-input::-webkit-outer-spin-button,
+.control-input::-webkit-inner-spin-button{ -webkit-appearance:none; margin:0 }
+.control-input{ -moz-appearance:textfield }
+
+
+    .row-2{grid-column:span 2}.row-3{grid-column:span 3}
+    @media (max-width:719px){ .row-2,.row-3{grid-column:auto} }
+
+    /* Segmented control (click-safe, neutral) */
+    .seg{display:flex;position:relative;border:1px solid var(--border);border-radius:10px;overflow:hidden;background:var(--neutral-bg)}
+    .seg input{ position:absolute; left:-9999px; width:1px; height:1px; opacity:0; pointer-events:none }
+    .seg label{flex:1;text-align:center;padding:8px 10px;font-size:14px;cursor:pointer;color:#1f2937;user-select:none}
+    .seg input:checked + label{background:#fff;color:var(--neutral-active);font-weight:700}
+
+    /* Tabs (neutral so they don’t look like CTAs) */
+    .tabs{display:flex;gap:4px;border-bottom:1px solid var(--border);margin-top:6px}
+    .tab{appearance:none;background:transparent;border:none;padding:10px 12px;font-weight:600;font-size:14px;color:#374151;border-bottom:2px solid transparent;cursor:pointer}
+    .tab[aria-selected="true"]{color:var(--neutral-active);border-bottom-color:#111827}
+    .tab:focus-visible{outline:2px solid var(--primary)}
+
+    /* CTA button */
+    .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:10px 16px;border-radius:10px;border:1px solid transparent;background:var(--primary);color:#fff;font-weight:700;cursor:pointer}
+    .btn:disabled{opacity:.6;cursor:not-allowed}
+    .helper{font-size:12px;color:#6b7280;margin-top:4px}
+    .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+
+    /* Summary (first fold) */
+    .summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:12px}
+    @media (max-width:719px){ .summary{grid-template-columns:1fr} }
+    .sum{padding:14px;border:1px solid var(--border);border-radius:10px;background:#f8fafc;text-align:center}
+    .sum h3{margin:0 0 6px;font-size:13px;color:#64748b;font-weight:600}
+    .sum p{margin:0;font-size:22px;font-weight:700;color:var(--primary);min-height:28px}
+    .chipbar{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:10px}
+    .chip{font-size:12px;border-radius:999px;padding:4px 10px;background:#eef2ff}
+    .chip.warn{background:#fef3c7;color:#92400e}
+    .chip.ok{background:#dcfce7;color:#166534}
+    .chip.err{background:#fee2e2;color:#991b1b}
+    #erc-warning{display:none;margin-top:10px;padding:12px;border-radius:10px;border:1px solid #f59e0b;background:#fffbeb}
+    #erc-warning h4{margin:0 0 4px;color:#b45309;font-size:14px}
+    .loading{min-height:28px;border-radius:8px;background:#e5e7eb;animation:pulse 1.4s ease-in-out infinite}
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+
+    /* Below the fold */
+    .stack{display:grid;gap:12px;margin-top:16px}
+    .chart-box{height:280px;padding:10px 12px}
+    table{width:100%;border-collapse:collapse;font-size:14px}
+    th,td{padding:10px 12px;border-bottom:1px solid var(--border);text-align:right}
+    th:first-child,td:first-child{text-align:left}
+    thead th{background:#f3f4f6;font-weight:700}
+
+    /* Footer */
+    .app-footer{background:#f3f4f6;border-top:1px solid var(--border);margin-top:20px}
+    .foot-in{max-width:1100px;margin:auto;padding:14px 16px;text-align:center;color:#4b5563}
+    .foot-small{font-size:12px;line-height:1.55;max-width:900px;margin:8px auto 0}
+  </style>
+</head>
+<body>
+  <!-- Header -->
+  <header class="app-header">
+    <div class="head-in">
+      <div class="brand">Brand › Mortgages › Calculators</div>
+      <nav class="nav">
+        <a href="#">About</a>
+        <a href="#">Methodology</a>
+        <a href="#">Contact</a>
+      </nav>
+    </div>
+  </header>
+
+  <div class="wrap">
+    <h1>Mortgage Overpayment Calculator</h1>
+    <p class="sub">See how overpayments could cut years off your mortgage and reduce interest. Supports daily interest, reduce-term vs reduce-payment, and ERC/allowance rules used by many UK lenders.</p>
+
+    <!-- FIRST FOLD: Inputs + Key Results -->
+    <section class="card section" aria-labelledby="calc-title">
+      <h2 id="calc-title" class="sr-only">Inputs</h2>
+      <form id="calculator-form" novalidate>
+        <div class="fields">
+          <div class="field">
+            <label for="principal">Mortgage balance</label>
+            <div class="control">
+  <span class="control-affix" aria-hidden="true">£</span>
+  <input id="principal"
+         class="control-input"
+         type="tel" inputmode="numeric" pattern="[0-9]*"
+         value="250000" minlength="1" />
+</div>
+
+          </div>
+          <div class="field">
+            <label for="termYears">Term — years</label>
+            <div class="inp"><input id="termYears" type="number" value="25" min="0" max="45" inputmode="numeric" /></div>
+          </div>
+          <div class="field">
+            <label for="termMonths">Term — months</label>
+            <div class="inp"><input id="termMonths" type="number" value="0" min="0" max="11" inputmode="numeric" /></div>
+          </div>
+
+          <div class="field">
+            <label for="apr">Interest rate</label>
+            <div class="control control--suffix">
+  <input id="apr" class="control-input" type="number" step="0.01" min="0" max="99" value="5.49" inputmode="decimal" />
+  <span class="control-affix" aria-hidden="true">%</span>
+</div>
+
+          </div>
+          <div class="field">
+            <label for="startDate">Start date (anniversary)</label>
+            <div class="inp"><input id="startDate" type="date" /></div>
+            <div class="helper">Used for ERC yearly windows.</div>
+          </div>
+          <div class="field">
+            <label for="paymentDay">Payment day (1–28)</label>
+            <div class="inp"><input id="paymentDay" type="number" value="1" min="1" max="28" inputmode="numeric" /></div>
+          </div>
+
+          <div class="field">
+            <label for="overpayLumpSum">One-off lump sum</label>
+            <div class="control">
+  <span class="control-affix" aria-hidden="true">£</span>
+  <input id="overpayLumpSum"
+         class="control-input"
+         type="tel" inputmode="numeric" pattern="[0-9]*"
+         value="0" />
+</div>
+
+          </div>
+          <div class="field">
+            <label for="overpayMonthly">Monthly overpayment</label>
+            <div class="control">
+  <span class="control-affix" aria-hidden="true">£</span>
+  <input id="overpayMonthly"
+         class="control-input"
+         type="tel" inputmode="numeric" pattern="[0-9]*"
+         value="200" />
+</div>
+
+          </div>
+
+          <div class="field">
+            <label>Apply overpayments</label>
+            <div class="seg" role="radiogroup" aria-label="Treatment">
+              <input type="radio" id="reduceTerm" name="treatment" value="reduceTerm" checked />
+              <label for="reduceTerm">Reduce term</label>
+              <input type="radio" id="reducePayment" name="treatment" value="reducePayment" />
+              <label for="reducePayment">Reduce payment</label>
+            </div>
+            <div id="recast-cadence-group" class="row-3" style="display:none;margin-top:8px">
+              <label for="recastCadence" style="font-size:13px;font-weight:600">Recalculate payment schedule</label>
+              <div class="inp">
+                <select id="recastCadence">
+                  <option value="annually" selected>Annually</option>
+                  <option value="lumpSum">After lump sum</option>
+                </select>
+              </div>
+              <div class="helper">Used only with “Reduce payment”.</div>
+            </div>
+          </div>
+
+          <!-- MODE TABS -->
+          <div class="field row-3">
+            <div class="tabs" role="tablist" aria-label="Mode tabs">
+              <button type="button" class="tab" id="tab-overpay" role="tab" aria-selected="true" aria-controls="panel-overpayment">Overpayments</button>
+              <button type="button" class="tab" id="tab-invest" role="tab" aria-selected="false" aria-controls="panel-invest">Compare vs. Invest</button>
+            </div>
+          </div>
+
+          <!-- Invest panel controls -->
+          <div class="field" id="panel-invest" role="tabpanel" aria-labelledby="tab-invest" hidden>
+            <label for="investReturn">Estimated annual investment return</label>
+            <div class="control control--suffix">
+  <input id="investReturn" class="control-input" type="number" value="6" step="0.1" />
+  <span class="control-affix" aria-hidden="true">%</span>
+</div>
+
+            <div class="helper">Projection for a diversified portfolio.</div>
+          </div>
+
+          <!-- ERC -->
+          <div class="field row-3">
+            <label style="display:flex;align-items:center;gap:8px">
+              <input id="enableErc" type="checkbox" />
+              Enable ERC Safety Net
+            </label>
+          </div>
+
+          <div id="erc-fields" class="row-3" style="display:none">
+            <div class="fields">
+              <div class="field">
+                <label for="ercAllowance">Fee-free allowance</label>
+                <div class="control control--suffix">
+  <input id="ercAllowance" class="control-input" type="number" value="10" min="0" max="100" step="0.1" />
+  <span class="control-affix" aria-hidden="true">%</span>
+</div>
+
+                <div class="helper">Annual % of balance you can overpay without charge.</div>
+              </div>
+              <div class="field">
+                <label>Allowance basis</label>
+                <div class="seg">
+                  <input type="radio" id="allowanceBasisYear" name="allowanceBasis" value="start_of_year_balance" checked />
+                  <label for="allowanceBasisYear">Start of year</label>
+                  <input type="radio" id="allowanceBasisOriginal" name="allowanceBasis" value="original_balance" />
+                  <label for="allowanceBasisOriginal">Original</label>
+                </div>
+              </div>
+              <div class="field">
+                <label for="dealEndDate">Deal end date (optional)</label>
+                <div class="inp"><input id="dealEndDate" type="date" /></div>
+              </div>
+              <div class="field row-3">
+                <label style="font-weight:600;font-size:13px">ERC bands (per year of fix)</label>
+                <div id="erc-bands-container" class="fields" style="grid-template-columns:1fr"></div>
+                <button type="button" id="add-erc-band-btn" class="btn" style="width:auto;margin-top:8px;padding:6px 10px">+ Add year</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:8px">
+          <button id="calculate-btn" type="submit" class="btn">Calculate</button>
+        </div>
+      </form>
+
+      <!-- Key results (first fold) -->
+      <div class="summary" aria-live="polite">
+        <div class="sum">
+          <h3>Years saved</h3>
+          <p id="years-saved-result" class="loading"></p>
+        </div>
+        <div class="sum">
+          <h3>Interest saved</h3>
+          <p id="interest-saved-result" class="loading"></p>
+        </div>
+        <div class="sum">
+          <h3>New payoff date</h3>
+          <p id="payoff-date-result" class="loading"></p>
+        </div>
+      </div>
+
+      <div id="results-status-container" class="chipbar" role="status" aria-live="polite"></div>
+
+      <div id="erc-warning">
+        <h4>⚠️ ERC Warning</h4>
+        <p id="erc-warning-text"></p>
+      </div>
+    </section>
+
+    <!-- BELOW THE FOLD: Chart + Table -->
+    <section class="stack">
+      <div class="card chart-box">
+        <canvas id="amortizationChart" aria-label="Amortization comparison chart"></canvas>
+      </div>
+      <div class="card section">
+        <h2 style="margin:0 0 8px">Detail</h2>
+        <div id="results-display"></div>
+      </div>
+    </section>
+  </div>
+
+  <!-- Footer -->
+  <footer class="app-footer">
+    <div class="foot-in">
+      <div>Reviewed by Jane Smith, CeMAP · Last reviewed 7 Oct 2025 · Version 2.2</div>
+      <div class="foot-small">This tool provides illustrative results based on your inputs. It is not financial advice. Overpayment limits and early repayment charges vary by lender; please check your documentation.</div>
+    </div>
+  </footer>
+
+  <script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const form = document.getElementById('calculator-form');
+    const calculateBtn = document.getElementById('calculate-btn');
+    const resultsStatusContainer = document.getElementById('results-status-container');
+    const ercWarningEl = document.getElementById('erc-warning');
+    const ercWarningTextEl = document.getElementById('erc-warning-text');
+    const resultsDisplay = document.getElementById('results-display');
+    const yearsSavedResultEl = document.getElementById('years-saved-result');
+    const interestSavedResultEl = document.getElementById('interest-saved-result');
+    const payoffDateResultEl = document.getElementById('payoff-date-result');
+    const tabOverpay = document.getElementById('tab-overpay');
+    const tabInvest = document.getElementById('tab-invest');
+    const panelInvest = document.getElementById('panel-invest');
+
+    let worker, amortizationChart;
+    let activeTab = 'panel-overpayment';
+    let ercBandsState = [{ratePct:5},{ratePct:4},{ratePct:3},{ratePct:2},{ratePct:1}];
+
+    const workerCode = `
+      self.onmessage = (e) => {
+        const inp = e.data;
+        const atNoon = d => { const x = new Date(d); x.setHours(12,0,0,0); return x; };
+        const parseDate = (str) => { if (!str) return atNoon(new Date()); const [y,m,d]=str.split('-').map(Number); return atNoon(new Date(y,m-1,d)); };
+        const addYears = (date, years) => { const nd = new Date(date); nd.setFullYear(nd.getFullYear()+years); return nd; };
+        const monthsDiff = (d1,d2)=> (d2.getFullYear()-d1.getFullYear())*12 + (d2.getMonth()-d1.getMonth());
+        const daysBetween = (d1,d2)=> Math.floor((atNoon(d2)-atNoon(d1))/(1000*60*60*24));
+        const P = inp.principal;
+        const totalMonths = inp.termYears*12 + inp.termMonths;
+        const apr = inp.apr/100;
+        const dailyRate = apr>0 ? Math.pow(1+apr,1/365)-1 : 0;
+
+        const startDate = parseDate(inp.startDate);
+        const paymentDay = inp.paymentDay;
+        const dealEndDate = inp.dealEndDate ? parseDate(inp.dealEndDate) : null;
+        const rnd2 = x => Math.round((x+Number.EPSILON)*100)/100;
+
+        function calc(isOver) {
+          let balance=P;
+          const i_m = apr/12;
+          let M = (i_m>0 && totalMonths>0) ? P*i_m*Math.pow(1+i_m,totalMonths)/(Math.pow(1+i_m,totalMonths)-1) : (totalMonths>0? P/totalMonths : 0);
+          const rows=[]; let totInt=0, totPen=0, neg=false, fail=false;
+          const annual=[P];
+          let current = atNoon(startDate);
+          let anniv = atNoon(startDate);
+          let opInWindow=0, startYearBal=P;
+
+          const nextPay = (from)=>{ let d=new Date(from); d.setDate(paymentDay); if (d<=from) d.setMonth(d.getMonth()+1); return d; };
+
+          for (let k=1; k<=totalMonths*3 && balance>0.01; k++){
+            const payDate = nextPay(current);
+            const days = daysBetween(current, payDate);
+            const interest = rnd2(balance*(Math.pow(1+dailyRate,days)-1));
+            if (M>0 && M<interest) neg=true;
+
+            let princ = M>0 ? M - interest : 0; if (princ<0) princ=0;
+            let op=0; if (isOver){ op += inp.overpayMonthly; if (k===1) op += inp.overpayLumpSum; }
+
+            let nextAnniv = addYears(anniv,1); let hit=false;
+            while (payDate>=nextAnniv){ hit=true; opInWindow=0; anniv=nextAnniv; startYearBal=balance; annual.push(Math.max(0,balance)); nextAnniv = addYears(anniv,1); }
+
+            if (inp.enableErc && isOver && op>0){
+              const yearsElapsed = (anniv.getFullYear()-startDate.getFullYear());
+              const basis = inp.allowanceBasis==='original_balance' ? P : startYearBal;
+              const allow = basis*(inp.ercAllowance/100);
+              const band = inp.ercBands.find(b=>b.year===yearsElapsed+1);
+              const ercRate = (dealEndDate && payDate>=dealEndDate) ? 0 : (band ? band.ratePct : 0);
+              if (ercRate>0){
+                const remain = Math.max(0, allow - opInWindow);
+                if (op>remain){ const excess=op-remain; totPen += rnd2(excess*(ercRate/100)); }
+              }
+              opInWindow += op;
+            }
+
+            let finalP = princ + op; if (balance<=finalP) finalP = balance;
+            balance -= finalP; totInt += interest; current = payDate;
+
+            rows.push({month:k,date:new Date(current),interest,principal:princ,overpayment:op,balance:Math.max(0,balance)});
+
+            let recast=false;
+            if (isOver && inp.treatment==='reducePayment' && balance>0){
+              if (inp.recastCadence==='annually' && hit) recast=true;
+              else if (inp.recastCadence==='lumpSum' && k===1 && inp.overpayLumpSum>0) recast=true;
+            }
+            if (recast){
+              const schedEnd = new Date(startDate); schedEnd.setMonth(schedEnd.getMonth()+totalMonths);
+              let rm = monthsDiff(current,schedEnd); if (rm<=0 && current<schedEnd) rm=1; const rem = Math.max(1,rm);
+              if (i_m>0 && rem>1){ M = balance*i_m*Math.pow(1+i_m,rem)/(Math.pow(1+i_m,rem)-1); }
+              else if (rem>1){ M = balance/rem; }
+              else { M = interest + Math.max(0, balance - op); }
+            }
+          }
+          if (balance>0.01) fail=true; else annual.push(0);
+
+          return { rows, totalInterest:totInt, totalPenalty:totPen, annualChartData:annual, finalDate: current, negativeAmortization:neg, failedToAmortize:fail };
+        }
+
+        const base = calc(false);
+        const over = calc(true);
+        const fmtDate = d => d.toLocaleDateString('en-GB',{month:'long',year:'numeric'});
+
+        let investFV=0;
+        if (inp.activeTab==='panel-invest'){
+          const r = inp.investReturn/100/12;
+          const n = base.rows.length;
+          let fv = inp.overpayLumpSum*Math.pow(1+r,n);
+          if (r>0) fv += inp.overpayMonthly*(Math.pow(1+r,n)-1)/r; else fv += inp.overpayMonthly*n;
+          investFV = rnd2(fv);
+        }
+
+        const summary = {
+          monthsSaved: base.rows.length - over.rows.length,
+          interestSaved: rnd2(base.totalInterest - over.totalInterest),
+          newPayoffDate: fmtDate(over.finalDate),
+          ercTotal: over.totalPenalty,
+          investmentProjection: investFV,
+          totalInvested: inp.overpayLumpSum + (inp.overpayMonthly*base.rows.length),
+          negativeAmortization: over.negativeAmortization,
+          failedToAmortize: over.failedToAmortize,
+          showErcBandsWarning: inp.showErcBandsWarning
+        };
+
+        self.postMessage({ summary, rows: over.rows, originalBalanceData: base.annualChartData, newBalanceData: over.annualChartData });
+      };
+    `;
+
+    const fmtGBP = v => new Intl.NumberFormat('en-GB',{style:'currency',currency:'GBP'}).format(v);
+    const fmtYM = m => { if (m<0) m=0; const y=Math.floor(m/12), mo=m%12; return `${y} ${y===1?'year':'years'} ${mo} ${mo===1?'month':'months'}`; };
+    const toNum = v => parseFloat(String(v||'0').replace(/[,£%\s]/g,''))||0;
+    const clamp = (v,min,max)=>Math.min(max,Math.max(min,v));
+    const pad = (a,n)=>[...a,...Array(Math.max(0,n-a.length)).fill(null)];
+
+    const renderErcBands = ()=>{
+      const c = document.getElementById('erc-bands-container');
+      c.innerHTML = '';
+      ercBandsState.forEach((b,i)=>{
+        const row = document.createElement('div');
+        row.className = 'fields';
+        row.style.gridTemplateColumns = '80px 1fr 84px';
+        row.innerHTML = `
+          <div class="inp"><input value="${i+1}" disabled/></div>
+          <div class="inp"><input class="erc-rate" data-i="${i}" type="number" step="0.1" min="0" max="100" value="${b.ratePct}"/><span class="suffix" aria-hidden="true">%</span></div>
+          <button type="button" data-i="${i}" class="btn" style="background:#e5e7eb;color:#111;border:1px solid #d1d5db">Remove</button>
+        `;
+        c.appendChild(row);
+      });
+    };
+
+    const setLoading = (on)=>{
+      calculateBtn.disabled = on;
+      calculateBtn.textContent = on ? 'Calculating…' : 'Calculate';
+      if (on){
+        yearsSavedResultEl.classList.add('loading'); yearsSavedResultEl.textContent='';
+        interestSavedResultEl.classList.add('loading'); interestSavedResultEl.textContent='';
+        payoffDateResultEl.classList.add('loading'); payoffDateResultEl.textContent='';
+        resultsDisplay.innerHTML='';
+      }
+    };
+
+    const renderResults = (data)=>{
+      yearsSavedResultEl.classList.remove('loading');
+      interestSavedResultEl.classList.remove('loading');
+      payoffDateResultEl.classList.remove('loading');
+
+      yearsSavedResultEl.textContent = fmtYM(data.summary.monthsSaved);
+      interestSavedResultEl.textContent = fmtGBP(data.summary.interestSaved);
+      payoffDateResultEl.textContent = data.summary.newPayoffDate;
+
+      const treat = document.querySelector('input[name="treatment"]:checked')?.value === 'reduceTerm' ? 'Reduce term' : 'Reduce payment';
+      let chips = [`<span class="chip">${treat}</span>`];
+      const ercEnabled = document.getElementById('enableErc').checked;
+
+      if (ercEnabled){
+        if (data.summary.ercTotal>0){
+          chips.push(`<span class="chip warn">ERC: ${fmtGBP(data.summary.ercTotal)}</span>`);
+          ercWarningEl.style.display = 'block';
+          ercWarningTextEl.textContent = `Your planned overpayments may trigger an estimated Early Repayment Charge of ${fmtGBP(data.summary.ercTotal)}. Consider adjusting to stay within allowance.`;
+        } else {
+          ercWarningEl.style.display = 'none';
+          chips.push('<span class="chip ok">Within fee-free allowance</span>');
+        }
+      } else {
+        ercWarningEl.style.display = 'none';
+      }
+      if (data.summary.negativeAmortization) chips.push('<span class="chip err">Payment below interest — balance would rise</span>');
+      if (data.summary.failedToAmortize) chips.push('<span class="chip err">Loan may not amortize in period</span>');
+      if (data.summary.showErcBandsWarning) chips.push('<span class="chip warn">No ERC bands defined for deal period</span>');
+      resultsStatusContainer.innerHTML = chips.join('');
+
+      renderAmortizationTable(data.rows);
+    };
+
+    const renderAmortizationTable = (rows)=>{
+      if (!rows || !rows.length) return;
+      const html = `
+        <table aria-label="Amortization detail (first 12 months)">
+          <thead><tr><th>Month</th><th>Interest</th><th>Principal</th><th>Overpayment</th><th>Balance</th></tr></thead>
+          <tbody>
+            ${rows.slice(0,12).map(r=>`
+              <tr>
+                <td>${r.month}</td>
+                <td>${fmtGBP(r.interest)}</td>
+                <td>${fmtGBP(r.principal)}</td>
+                <td>${fmtGBP(r.overpayment)}</td>
+                <td>${fmtGBP(r.balance)}</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      `;
+      resultsDisplay.innerHTML = html;
+    };
+
+    const renderChart = (oData,pData)=>{
+      const ctx = document.getElementById('amortizationChart').getContext('2d');
+      const len = Math.max(oData.length,pData.length);
+      const o = pad(oData,len), p = pad(pData,len);
+      const labels = Array.from({length:len},(_,i)=>`Year ${i}`);
+      if (amortizationChart) amortizationChart.destroy();
+      const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+      amortizationChart = new Chart(ctx,{
+        type:'line',
+        data:{
+          labels,
+          datasets:[
+            {label:'Original Balance', data:o, fill:false, tension:.1, borderColor:'rgb(203,213,225)'},
+            {label:'With Overpayments', data:p, fill:true, tension:.1, borderColor:'rgb(37,99,235)', backgroundColor:'rgba(37,99,235,.12)'}
+          ]
+        },
+        options:{
+          responsive:true, maintainAspectRatio:false,
+          animation: reduceMotion ? false : {duration:250},
+          scales:{ y:{ ticks:{ callback:(v)=> Number.isFinite(v)? '£'+(v/1000)+'k':'' } } },
+          plugins:{ legend:{position:'top'}, tooltip:{ callbacks:{ label:(c)=> c.raw==null?'':`${c.dataset.label}: ${fmtGBP(c.raw)}` } } }
+        }
+      });
+    };
+
+    const handleCalculate = ()=>{
+      setLoading(true);
+      const ercBands = ercBandsState.map((b,i)=>({year:i+1, ratePct:b.ratePct}));
+      const inputs = {
+        principal: toNum(document.getElementById('principal').value),
+        termYears: toNum(document.getElementById('termYears').value),
+        termMonths: toNum(document.getElementById('termMonths').value),
+        apr: clamp(toNum(document.getElementById('apr').value),0,99),
+        startDate: document.getElementById('startDate').value || null,
+        paymentDay: clamp(toNum(document.getElementById('paymentDay').value),1,28),
+        overpayLumpSum: Math.max(0,toNum(document.getElementById('overpayLumpSum').value)),
+        overpayMonthly: Math.max(0,toNum(document.getElementById('overpayMonthly').value)),
+        treatment: document.querySelector('input[name="treatment"]:checked').value,
+        recastCadence: document.getElementById('recastCadence').value,
+        enableErc: document.getElementById('enableErc').checked,
+        ercAllowance: clamp(toNum(document.getElementById('ercAllowance').value),0,100),
+        allowanceBasis: document.querySelector('input[name="allowanceBasis"]:checked')?.value || 'start_of_year_balance',
+        dealEndDate: document.getElementById('dealEndDate').value || null,
+        ercBands,
+        activeTab,
+        investReturn: clamp(toNum(document.getElementById('investReturn').value),-50,50),
+      };
+      inputs.showErcBandsWarning = inputs.enableErc && inputs.dealEndDate && inputs.ercBands.length===0;
+      worker.postMessage(inputs);
+    };
+
+    const init = ()=>{
+      const sd = document.getElementById('startDate');
+      if ('valueAsDate' in sd) sd.valueAsDate = new Date(); else sd.value = new Date().toISOString().slice(0,10);
+
+      const blob = new Blob([workerCode],{type:'application/javascript'});
+      const url = URL.createObjectURL(blob);
+      worker = new Worker(url);
+      worker.onmessage = (e)=>{ setLoading(false); renderResults(e.data); renderChart(e.data.originalBalanceData, e.data.newBalanceData); };
+      worker.onerror = ()=>{ setLoading(false); resultsStatusContainer.innerHTML = '<span class="chip err">Something went wrong. Check inputs and try again.</span>'; };
+      window.addEventListener('beforeunload', ()=> URL.revokeObjectURL(url));
+
+      form.addEventListener('submit', (ev)=>{ ev.preventDefault(); handleCalculate(); });
+
+      const recastGroup = document.getElementById('recast-cadence-group');
+      const recastSelect = document.getElementById('recastCadence');
+      document.querySelectorAll('input[name="treatment"]').forEach(r=>{
+        r.addEventListener('change', (e)=>{
+          const isReducePayment = e.target.value==='reducePayment';
+          recastGroup.style.display = isReducePayment ? 'block' : 'none';
+          recastSelect.disabled = !isReducePayment;
+        });
+      });
+
+      function activateTab(which){
+        activeTab = which;
+        if (which==='panel-overpayment'){
+          tabOverpay.setAttribute('aria-selected','true');
+          tabInvest.setAttribute('aria-selected','false');
+          panelInvest.hidden = true;
+        } else {
+          tabOverpay.setAttribute('aria-selected','false');
+          tabInvest.setAttribute('aria-selected','true');
+          panelInvest.hidden = false;
+        }
+        handleCalculate();
+      }
+      tabOverpay.addEventListener('click', ()=> activateTab('panel-overpayment'));
+      tabInvest.addEventListener('click', ()=> activateTab('panel-invest'));
+      tabOverpay.addEventListener('keydown', (e)=>{ if (e.key==='ArrowRight') { e.preventDefault(); tabInvest.focus(); activateTab('panel-invest'); } });
+      tabInvest.addEventListener('keydown', (e)=>{ if (e.key==='ArrowLeft')  { e.preventDefault(); tabOverpay.focus(); activateTab('panel-overpayment'); } });
+
+      renderErcBands();
+      const bandsContainer = document.getElementById('erc-bands-container');
+      document.getElementById('add-erc-band-btn').addEventListener('click', ()=>{ ercBandsState.push({ratePct:1}); renderErcBands(); });
+      bandsContainer.addEventListener('input', (e)=>{
+        if (e.target.classList.contains('erc-rate')){
+          const i = +e.target.dataset.i; const v = clamp(toNum(e.target.value),0,100);
+          ercBandsState[i].ratePct = v; e.target.value = v;
+        }
+      });
+      bandsContainer.addEventListener('click', (e)=>{
+        if (e.target.matches('button[data-i]')){ const i = +e.target.dataset.i; ercBandsState.splice(i,1); renderErcBands(); }
+      });
+
+      activateTab('panel-overpayment'); // initial calc
+    };
+
+    init();
+  });
+  </script>
+</body>
+</html>
